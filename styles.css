@@ -348,6 +348,30 @@ table.preview-table tr:hover td { background: var(--surface-alt); }
   .chart-card-body { height: 220px; }
 }
 
+/* ---------- Charts & Analytics page: dedicated 2-column grid ---------- */
+/* Scoped strictly to #view-charts so Dashboard Overview's chart-grid
+   (Monthly Trend full-width + Vendor/Category side-by-side) is completely
+   untouched. Fixes charts stacking into a single right-hand column with a
+   large empty gap on the left: instead of an auto-fit track count that can
+   collapse to one column, this locks in two explicit equal-width columns
+   (~48% each once the 16px gap is subtracted) that always fill the row,
+   and wraps a new row automatically as more chart cards are added. */
+#view-charts .chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+#view-charts .chart-card { width: 100%; min-width: 0; }
+#view-charts .chart-card.full { grid-column: 1 / -1; }
+#view-charts .chart-card-body { height: 280px; width: 100%; }
+@media (max-width: 900px) {
+  #view-charts .chart-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  #view-charts .chart-card-body { height: 220px; }
+}
+
 /* ---------- Filters bar ---------- */
 .filters-bar {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
