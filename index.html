@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Auto PO Dashboard Generator</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+<!-- Core libraries are loaded by lib-loader.js below, which tries multiple CDNs
+     in sequence and verifies each global actually exists before continuing.
+     This avoids a single bad/blocked CDN URL silently breaking the app. -->
+<script src="lib-loader.js"></script>
+</head>
+<body>
+
+<!-- Shown only if a required library fails to load from every CDN tried -->
+<div id="libLoadError" style="display:none; position:fixed; inset:0; background:#fff; z-index:9999; padding:40px; font-family:-apple-system,Segoe UI,Inter,sans-serif;">
+  <div style="max-width:560px; margin:60px auto; text-align:center;">
+    <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
+    <h2 style="margin:0 0 10px;">Couldn't load required libraries</h2>
+    <p style="color:#475569; line-height:1.6;">This app needs a few JavaScript libraries from a CDN (jsdelivr / cdnjs / unpkg) to run. Your network or browser appears to be blocking all of them.</p>
+    <p style="color:#475569; line-height:1.6;">Please check your internet connection, disable any ad-blocker or script-blocker for this page, and then <a href="javascript:location.reload()">reload the page</a>.</p>
+    <p style="color:#94a3b8; font-size:12px; margin-top:18px;">Missing: <span id="libLoadErrorList"></span></p>
+  </div>
+</div>
+
+<div class="app-shell">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-mark">PO</div>
+      <div>
+        <div class="sidebar-brand-text">Auto PO Dashboard</div>
+        <div class="sidebar-brand-sub">AI Analytics Generator</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Workspace</div>
+      <div class="sidebar-link active" data-view="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Data
+      </div>
+
+      <div id="postUploadNav" style="display:none;">
+        <div class="sidebar-section-label">Analytics</div>
+        <div class="sidebar-link" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          Dashboard
+        </div>
+        <div class="sidebar-link" data-view="charts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Charts &amp; Analytics
+        </div>
+        <div class="sidebar-link" data-view="items">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7L12 3 4 7l8 4 8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/></svg>
+          Item Analysis
+        </div>
+        <div class="sidebar-link" data-view="vendors">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/></svg>
+          Vendor Analysis
+        </div>
+        <div class="sidebar-link" data-view="scorecard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+          Vendor Scorecard
+        </div>
+        <div class="sidebar-link" data-view="insights">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .8 1.6V17h6.4v-.7c0-.6.3-1.2.8-1.6A7 7 0 0012 2z"/></svg>
+          AI Insights
+        </div>
+        <div class="sidebar-link" data-view="savings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          Savings Opportunity
+        </div>
+        <div class="sidebar-link" data-view="recommendations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Recommendations
+        </div>
+        <div class="sidebar-link" data-view="alerts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          Smart Alerts
+        </div>
+        <div class="sidebar-link" data-view="data">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          Data Table
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">Generates fully client-side. Your data never leaves this browser tab.</div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="icon-btn sidebar-toggle" id="sidebarToggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </div>
+        <div class="topbar-title" id="topbarTitleText">Upload Data</div>
+      </div>
+      <div class="topbar-right">
+        <div class="icon-btn" id="themeToggle" title="Toggle dark mode">
+          <svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </div>
+        <div class="export-menu-wrap">
+          <button class="btn btn-primary btn-sm" id="exportMenuToggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+          </button>
+          <div class="export-menu" id="exportMenu">
+            <div class="export-menu-item" id="exportHtml"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Interactive HTML Dashboard</div>
+            <div class="export-menu-item" id="exportPdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF Report</div>
+            <div class="export-menu-item" id="exportExcel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/></svg>Excel Summary</div>
+            <div class="export-menu-item" id="exportPptx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>PowerPoint Report</div>
+            <div class="export-menu-item" id="exportCsv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/></svg>CSV Summary</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ================= VIEW: UPLOAD ================= -->
+      <section class="view active" id="view-upload">
+        <div class="upload-wrap">
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="upload-title">Drag &amp; drop your Purchase Order file here</div>
+            <div class="upload-sub">or click anywhere in this box to browse — dashboard generates automatically, no setup needed</div>
+            <button class="btn btn-primary" id="browseBtn" type="button">Browse File</button>
+            <input type="file" id="fileInput" class="upload-hidden-input" accept=".xlsx,.xls,.csv">
+            <div class="upload-formats">
+              <span class="format-chip">.XLSX</span>
+              <span class="format-chip">.XLS</span>
+              <span class="format-chip">.CSV</span>
+              <span class="format-chip">Multi-sheet supported</span>
+              <span class="format-chip">Auto header detection</span>
+            </div>
+          </div>
+
+          <div class="gsheet-row">
+            <input type="text" class="gsheet-input" id="gsheetInput" placeholder="Or paste a public Google Sheets link…">
+            <button class="btn btn-outline" id="gsheetLoadBtn" type="button">Load Sheet</button>
+          </div>
+
+          <!-- Sheet picker + data preview, hidden until a file is loaded -->
+          <div class="preview-card" id="previewCard" style="display:none;">
+            <div class="preview-head">
+              <div class="preview-head-title">Data Preview</div>
+              <div id="previewRowCount" style="font-size:12px;color:var(--text-muted);"></div>
+            </div>
+            <div class="sheet-tabs" id="sheetTabs"></div>
+            <div class="preview-table-wrap">
+              <table class="preview-table">
+                <thead><tr id="previewHeadRow"></tr></thead>
+                <tbody id="previewBody"></tbody>
+              </table>
+            </div>
+            <div class="preview-actions">
+              <button class="btn btn-primary" id="generateBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                Generate Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: DASHBOARD ================= -->
+      <section class="view" id="view-dashboard">
+        <div class="filters-bar">
+          <div class="filter-field">
+            <label>Financial Year</label>
+            <select id="filterFY"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Vendor</label>
+            <select id="filterVendor"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Item</label>
+            <select id="filterItem"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Category</label>
+            <select id="filterCategory"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Tax Rate</label>
+            <select id="filterTaxRate"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>PO Number</label>
+            <select id="filterPO"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>PO Raised By</label>
+            <select id="filterRaisedBy"><option value="">All</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Date From</label>
+            <input type="date" id="filterDateFrom">
+          </div>
+          <div class="filter-field">
+            <label>Date To</label>
+            <input type="date" id="filterDateTo">
+          </div>
+          <button class="btn btn-outline btn-sm filter-clear" id="filterClear" type="button">Clear Filters</button>
+          <span id="filterBusyIndicator" style="display:none;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted);"><span class="spinner"></span> Filtering…</span>
+        </div>
+
+        <div class="drill-breadcrumb" id="drillBreadcrumb" style="display:none;"></div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card" style="--accent:#1d4ed8;">
+            <div class="kpi-label">Total Purchase Value <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span></div>
+            <div class="kpi-value tabular" id="kpiTotalValue">—</div>
+          </div>
+          <div class="kpi-card" style="--accent:#0d9488;">
+            <div class="kpi-label">Total Purchase Orders <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span></div>
+            <div class="kpi-value tabular" id="kpiTotalPO">—</div>
+          </div>
+          <div class="kpi-card" style="--accent:#d97706;">
+            <div class="kpi-label">Total Vendors <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/></svg></span></div>
+            <div class="kpi-value tabular" id="kpiTotalVendors">—</div>
+          </div>
+          <div class="kpi-card" style="--accent:#7c3aed;">
+            <div class="kpi-label">Total Items <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7L12 3 4 7l8 4 8-4z"/><path d="M4 7v10l8 4 8-4V7"/></svg></span></div>
+            <div class="kpi-value tabular" id="kpiTotalItems">—</div>
+          </div>
+          <div class="kpi-card" style="--accent:#0891b2;">
+            <div class="kpi-label">Average Unit Rate <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span></div>
+            <div class="kpi-value tabular" id="kpiAvgRate">—</div>
+          </div>
+          <div class="kpi-card" style="--accent:#dc2626;">
+            <div class="kpi-label">Highest Value Item <span class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4h10v3a5 5 0 01-5 5 5 5 0 01-5-5V4z"/></svg></span></div>
+            <div class="kpi-value" id="kpiHighestItem" style="font-size:16px;">—</div>
+            <div class="kpi-sub" id="kpiHighestItemSub"></div>
+          </div>
+          <div class="kpi-card kpi-savings" style="--accent:#16a34a; grid-column: span 2;">
+            <div class="kpi-label">Potential Savings <span class="kpi-icon" style="background:var(--teal-light);color:var(--teal);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></span></div>
+            <div class="kpi-value tabular" id="kpiPotentialSavings" style="color:var(--teal)">—</div>
+            <div class="kpi-sub">If duplicate items had always been bought at the lowest available rate</div>
+          </div>
+        </div>
+
+        <!-- Executive Summary Card -->
+        <div class="exec-summary-wrap">
+          <div class="section-title" style="margin-bottom:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg> Executive Summary</div>
+          <div id="executiveSummaryCard" class="exec-summary-card"></div>
+        </div>
+
+        <div class="insights-strip">
+          <div class="insights-header">
+            <div class="section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .8 1.6V17h6.4v-.7c0-.6.3-1.2.8-1.6A7 7 0 0012 2z"/></svg>AI Insights</div>
+          </div>
+          <div class="insights-scroll" id="insightsScroll"></div>
+        </div>
+
+        <div class="alerts-strip-wrap" id="dashboardAlertsStrip"></div>
+
+        <div class="chart-grid">
+          <div class="chart-card full">
+            <div class="chart-card-head"><div class="chart-card-title">Monthly Purchase Trend</div></div>
+            <div class="chart-card-body"><canvas id="chartMonthlyTrend"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Vendor Wise Purchase</div><span class="drill-hint" title="Click a bar or segment to drill down">Click to drill down</span></div>
+            <div class="chart-card-body"><canvas id="chartVendorWise"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Category Wise Purchase</div><span class="drill-hint" title="Click a bar or segment to drill down">Click to drill down</span></div>
+            <div class="chart-card-body"><canvas id="chartCategoryWise"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: CHARTS ================= -->
+      <section class="view" id="view-charts">
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Item Wise Purchase</div><span class="drill-hint" title="Click a bar or segment to drill down">Click to drill down</span></div>
+            <div class="chart-card-body"><canvas id="chartItemWise"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Tax Analysis</div></div>
+            <div class="chart-card-body"><canvas id="chartTaxAnalysis"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Discount Analysis</div></div>
+            <div class="chart-card-body"><canvas id="chartDiscountAnalysis"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Purchase Value by Financial Year</div><span class="drill-hint" title="Click a bar or segment to drill down">Click to drill down</span></div>
+            <div class="chart-card-body"><canvas id="chartFYWise"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Top 10 Highest Cost Items</div><span class="drill-hint" title="Click a bar or segment to drill down">Click to drill down</span></div>
+            <div class="chart-card-body"><canvas id="chartTop10Cost"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-head"><div class="chart-card-title">Top 10 Frequently Purchased Items</div><span class="drill-hint" title="Click a bar or segment to drill down">Click to drill down</span></div>
+            <div class="chart-card-body"><canvas id="chartTop10Frequent"></canvas></div>
+          </div>
+          <div class="chart-card full">
+            <div class="chart-card-head"><div class="chart-card-title">Unit Rate Trend (Top Duplicate Items)</div></div>
+            <div class="chart-card-body"><canvas id="chartUnitRateTrend"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: ITEM ANALYSIS ================= -->
+      <section class="view" id="view-items">
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Item Description</th><th>Category</th><th>Frequency</th><th>Total Qty</th>
+              <th>Avg Rate</th><th>Latest Rate</th><th>Min Rate</th><th>Max Rate</th>
+              <th>Total Value</th><th>Price Trend</th><th>Analysis</th>
+            </tr></thead>
+            <tbody id="itemTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: VENDOR SCORECARD ================= -->
+      <section class="view" id="view-scorecard">
+        <div class="section-title" style="margin-bottom:16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+          Vendor Scorecard — scored on price stability, purchase frequency, and spend scale
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Vendor Name</th><th>Avg Unit Rate</th><th>Total Spend</th><th>PO Count</th>
+              <th>Price Stability</th><th>Duplicate Items</th><th>Score / 100</th>
+            </tr></thead>
+            <tbody id="scorecardTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: SAVINGS OPPORTUNITY ================= -->
+      <section class="view" id="view-savings">
+        <div class="section-title" style="margin-bottom:16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          Savings Opportunity — based on price variation across duplicate purchases
+        </div>
+        <div id="savingsPanelWrap"></div>
+      </section>
+
+      <!-- ================= VIEW: SMART RECOMMENDATIONS ================= -->
+      <section class="view" id="view-recommendations">
+        <div class="section-title" style="margin-bottom:16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Smart Purchase Recommendations
+        </div>
+        <div id="recommendationsWrap"></div>
+      </section>
+
+      <!-- ================= VIEW: SMART ALERTS ================= -->
+      <section class="view" id="view-alerts">
+        <div class="section-title" style="margin-bottom:16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          Smart Alerts — procurement anomalies and action items
+        </div>
+        <div id="smartAlertsWrap"></div>
+      </section>
+
+      <!-- ================= VIEW: VENDOR ANALYSIS ================= -->
+      <section class="view" id="view-vendors">
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Vendor Name</th><th>Total Purchase Value</th><th>PO Count</th><th>Distinct Items Supplied</th></tr></thead>
+            <tbody id="vendorTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: AI INSIGHTS (full) ================= -->
+      <section class="view" id="view-insights">
+        <div class="insights-scroll" id="insightsFullList" style="flex-wrap:wrap; overflow:visible;"></div>
+      </section>
+
+      <!-- ================= VIEW: DATA TABLE ================= -->
+      <section class="view" id="view-data">
+        <div class="table-toolbar">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="dataSearchInput" placeholder="Search PO number, vendor, item, raised by, GSTN, or remarks…">
+          </div>
+          <div id="dataTableCount" style="font-size:12px;color:var(--text-muted);"></div>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th data-sort="poNumber">PO Number</th>
+              <th data-sort="poDate">PO Date</th>
+              <th data-sort="poRaisedBy">Raised By</th>
+              <th data-sort="vendorName">Vendor</th>
+              <th data-sort="itemDescription">Item</th>
+              <th data-sort="dimension">Dimension</th>
+              <th data-sort="quantity">Qty</th>
+              <th data-sort="unit">Unit</th>
+              <th data-sort="unitRate">Unit Rate</th>
+              <th data-sort="taxAmount">Tax</th>
+              <th data-sort="netTotal">Net / Gross Amount</th>
+              <th data-sort="financialYear">Year</th>
+              <th>Remarks</th>
+            </tr></thead>
+            <tbody id="dataTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- App scripts -->
+<script src="data-core.js"></script>
+<script src="price-analysis.js"></script>
+<script src="savings-analysis.js"></script>
+<script src="vendor-scorecard.js"></script>
+<script src="recommendations.js"></script>
+<script src="smart-alerts.js"></script>
+<script src="charts.js"></script>
+<script src="export-csv.js"></script>
+<script src="export-excel.js"></script>
+<script src="export-pdf.js"></script>
+<script src="export-pptx.js"></script>
+<script src="app.js"></script>
+
+<!-- WHY? MODAL -->
+<div class="why-modal-overlay" id="whyModalOverlay">
+  <div class="why-modal">
+    <div class="why-modal-header">
+      <div>
+        <div class="why-modal-title">Price Change Analysis</div>
+        <div class="why-modal-subtitle" id="whyModalItemTitle"></div>
+      </div>
+      <button class="why-modal-close" id="whyModalClose" type="button" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="why-modal-body" id="whyModalBody"></div>
+  </div>
+</div>
+
+</body>
+</html>
