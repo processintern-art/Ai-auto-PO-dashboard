@@ -13,7 +13,7 @@
   // Google Sheet, exported live as CSV. Every page load/refresh re-fetches
   // this URL, so the dashboard always reflects the latest sheet contents.
   // Swap this one constant to point the whole app at a different sheet.
-  const DEFAULT_CSV_URL = https://docs.google.com/spreadsheets/d/e/2PACX-1vRv8dr4rGk_3ObJlWVApNBFEbUnvs8mjlQ6XZ4yUkD-3N5MqFjUPhlTdZ8_fyWdSrEJ55QEVSU8Yc4r/pub?gid=1370315691&single=true&output=csv
+  const DEFAULT_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRv8dr4rGk_3ObJlWVApNBFEbUnvs8mjlQ6XZ4yUkD-3N5MqFjUPhlTdZ8_fyWdSrEJ55QEVSU8Yc4r/pub?gid=1370315691&single=true&output=csv';
 
   const App = {
     workbook: null,          // raw SheetJS workbook
