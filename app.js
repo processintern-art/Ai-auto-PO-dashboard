@@ -1,15 +1,18 @@
 /* ============================================================
-   AI Auto PO Dashboard — App Controller
-   Ties together: file parsing (SheetJS), PODataCore (mapping +
-   aggregation + insights), POCharts, and all export modules.
+   AI Auto PO Dashboard — Live Dashboard Controller
+   Production live-data mode: no upload UI. On every page load /
+   refresh, fetches the configured Google Sheets CSV export and
+   pipes it straight through: parsing (SheetJS) -> PODataCore
+   (mapping + aggregation + insights) -> POCharts + all export
+   modules. The dashboard view is the only entry point.
    ============================================================ */
 (function () {
   'use strict';
 
-  // Default / primary data source for this deployment: a published Google
-  // Sheet, exported live as CSV. Pre-fills the Google Sheet input box and is
-  // auto-fetched on load so the dashboard populates without any manual step.
-  // Swap this single constant to point the whole app at a different sheet.
+  // The single configured data source for this deployment: a published
+  // Google Sheet, exported live as CSV. Every page load/refresh re-fetches
+  // this URL, so the dashboard always reflects the latest sheet contents.
+  // Swap this one constant to point the whole app at a different sheet.
   const DEFAULT_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRv8dr4rGk_3ObJlWVApNBFEbUnvs8mjlQ6XZ4yUkD-3N5MqFjUPhlTdZ8_fyWdSrEJ55QEVSU8Yc4r/pub?gid=0&single=true&output=csv';
 
   const App = {
@@ -44,11 +47,10 @@
     ready.then(() => {
       initTheme();
       initSidebar();
-      initUpload();
       initExportMenu();
       initTableControls();
       initWhyModal();
-      loadGoogleSheet(DEFAULT_CSV_URL, true);
+      loadLiveDashboard();
     }).catch(err => {
       // lib-loader.js already shows an in-page error banner in this case;
       // log for diagnostics but don't double-report to the user here.
@@ -101,108 +103,34 @@
   }
   function viewTitle(v) {
     return {
-      upload: 'Upload Data', dashboard: 'Dashboard Overview', charts: 'Charts & Analytics',
+      dashboard: 'Dashboard Overview', charts: 'Charts & Analytics',
       items: 'Item Analysis', vendors: 'Vendor Analysis', insights: 'AI Insights',
       data: 'Data Table', scorecard: 'Vendor Scorecard', savings: 'Savings Opportunity',
       recommendations: 'Smart Recommendations', alerts: 'Smart Alerts'
     }[v] || 'Dashboard';
   }
 
-  /* ---------------- Upload ---------------- */
-  function initUpload() {
-    const zone = document.getElementById('uploadZone');
-    const input = document.getElementById('fileInput');
-    const browseBtn = document.getElementById('browseBtn');
-
-    browseBtn.addEventListener('click', (e) => { e.stopPropagation(); input.click(); });
-    zone.addEventListener('click', () => input.click());
-    input.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-
-    ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, (e) => {
-      e.preventDefault(); zone.classList.add('dragover');
-    }));
-    ['dragleave', 'drop'].forEach(evt => zone.addEventListener(evt, (e) => {
-      e.preventDefault(); zone.classList.remove('dragover');
-    }));
-    zone.addEventListener('drop', (e) => {
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    });
-
-    const gsheetInput = document.getElementById('gsheetInput');
-    if (!gsheetInput.value.trim()) gsheetInput.value = DEFAULT_CSV_URL;
-    document.getElementById('gsheetLoadBtn').addEventListener('click', () => loadGoogleSheet());
-  }
-
-  function handleFile(file) {
-    const name = file.name.toLowerCase();
-    if (!/\.(xlsx|xls|csv)$/.test(name)) {
-      showToast('Please upload a .xlsx, .xls, or .csv file', 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: 'array', cellDates: true });
-        App.workbook = wb;
-        App.sheetNames = wb.SheetNames;
-        loadSheet(wb.SheetNames[0]);
-        showToast(`Loaded "${file.name}" — ${wb.SheetNames.length} sheet(s) found`, 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Could not read this file. Please check the format.', 'error');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
+  /* ---------------- Live data load ---------------- */
   /**
-   * Turns whatever the user pasted into a fetchable CSV URL.
-   * Two shapes are supported:
-   *  - An already-built CSV export/publish link (contains format=csv or
-   *    output=csv, e.g. a "Publish to web" link like
-   *    /spreadsheets/d/e/<id>/pub?...&output=csv) — used as-is, since these
-   *    don't follow the plain /d/<sheetId>/ pattern and reconstructing them
-   *    would break the id.
-   *  - A normal share/edit link (/spreadsheets/d/<sheetId>/edit#gid=...) —
-   *    rewritten into its CSV export equivalent.
+   * The entire data pipeline for this production build: fetch the
+   * configured Google Sheets CSV export, parse it, and generate the full
+   * dashboard — no upload, no manual URL entry, no confirmation click.
+   * Runs once per page load, so every browser refresh re-fetches the
+   * latest sheet contents.
    */
-  function resolveCsvUrl(rawUrl) {
-    if (/[?&](format|output)=csv/i.test(rawUrl)) return rawUrl;
-    const match = rawUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!match) return null;
-    const sheetId = match[1];
-    const gidMatch = rawUrl.match(/gid=([0-9]+)/);
-    const gid = gidMatch ? gidMatch[1] : '0';
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
-  }
-
-  function loadGoogleSheet(overrideUrl, autoGenerate) {
-    const rawUrl = (overrideUrl != null ? overrideUrl : document.getElementById('gsheetInput').value).trim();
-    if (!rawUrl) return;
-    const csvUrl = resolveCsvUrl(rawUrl);
-    if (!csvUrl) { showToast('Could not parse that Google Sheets URL', 'error'); return; }
-
-    showToast(autoGenerate ? 'Loading dashboard data source...' : 'Fetching Google Sheet...', 'info');
-    fetch(csvUrl)
+  function loadLiveDashboard() {
+    showLoadingOverlay('Fetching live data…');
+    fetch(DEFAULT_CSV_URL)
       .then(res => { if (!res.ok) throw new Error('fetch failed'); return res.text(); })
       .then(csvText => {
         const wb = XLSX.read(csvText, { type: 'string' });
         App.workbook = wb;
         App.sheetNames = wb.SheetNames;
         loadSheet(wb.SheetNames[0]);
-        if (autoGenerate) {
-          // Skip the manual preview step entirely: parse straight through to
-          // a fully generated dashboard (KPIs, charts, tables, AI insights,
-          // vendor analysis, savings analysis) with no click required.
-          generateDashboard();
-        } else {
-          showToast('Google Sheet loaded successfully', 'success');
-        }
+        generateDashboard();
       })
       .catch(() => {
-        showToast('Could not fetch this sheet. Make sure it is shared as "Anyone with the link can view".', 'error');
+        showLoadingOverlay('Could not load the live data source. Make sure the sheet is published and shared as "Anyone with the link can view", then refresh.', true);
       });
   }
 
@@ -213,14 +141,12 @@
     const { headerRowIdx, headers } = detectHeaderRow(aoa);
     App.rawHeaders = headers;
     App.rawRows = aoa.slice(headerRowIdx + 1);
-    renderSheetTabs();
-    renderPreview();
   }
 
   /**
    * Auto-detect the header row: scan the first ~10 rows, score each by
    * "text-density + non-empty cell count", pick the best candidate.
-   * Handles uploads where titles/blank rows precede the real header.
+   * Handles sheets where titles/blank rows precede the real header.
    */
   function detectHeaderRow(aoa) {
     const scanLimit = Math.min(10, aoa.length);
@@ -244,82 +170,28 @@
     return { headerRowIdx: best.idx, headers };
   }
 
-  function renderSheetTabs() {
-    const wrap = document.getElementById('sheetTabs');
-    wrap.innerHTML = '';
-    if (App.sheetNames.length <= 1) { wrap.style.display = 'none'; return; }
-    wrap.style.display = 'flex';
-    App.sheetNames.forEach(name => {
-      const tab = document.createElement('div');
-      tab.className = 'sheet-tab' + (name === App.activeSheet ? ' active' : '');
-      tab.textContent = name;
-      tab.addEventListener('click', () => { loadSheet(name); });
-      wrap.appendChild(tab);
-    });
-  }
-
-  function renderPreview() {
-    document.getElementById('previewCard').style.display = 'block';
-    const mapResult = PODataCore.mapColumns(App.rawHeaders, App.rawRows.slice(0, 50));
-    const reverseMap = {};
-    for (const [field, header] of Object.entries(mapResult.mapping)) reverseMap[header] = field;
-
-    const theadRow = document.getElementById('previewHeadRow');
-    theadRow.innerHTML = '';
-    App.rawHeaders.forEach(h => {
-      const th = document.createElement('th');
-      th.textContent = h;
-      if (reverseMap[h]) {
-        const badge = document.createElement('span');
-        badge.className = 'mapping-badge';
-        badge.textContent = PODataCore.CANONICAL_FIELDS[reverseMap[h]].label;
-        th.appendChild(badge);
-      }
-      theadRow.appendChild(th);
-    });
-
-    const tbody = document.getElementById('previewBody');
-    tbody.innerHTML = '';
-    App.rawRows.slice(0, 8).forEach(row => {
-      const tr = document.createElement('tr');
-      App.rawHeaders.forEach((_, idx) => {
-        const td = document.createElement('td');
-        td.textContent = row[idx] !== null && row[idx] !== undefined ? String(row[idx]) : '';
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('previewRowCount').textContent = `${App.rawRows.length} rows detected`;
-    document.getElementById('generateBtn').onclick = generateDashboard;
-  }
-
   // Threshold above which we prefer the Web Worker path even if it's
   // available, vs. just running synchronously for small files (worker
   // setup/postMessage overhead isn't worth it for a 50-row file).
   const WORKER_ROW_THRESHOLD = 2000;
 
   function generateDashboard() {
-    const btn = document.getElementById('generateBtn');
-    const originalHtml = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner"></span> Generating...';
-    btn.disabled = true;
-
+    showLoadingOverlay('Generating dashboard…');
     const rowCount = App.rawRows.length;
     const useWorker = rowCount >= WORKER_ROW_THRESHOLD && typeof Worker !== 'undefined';
 
     if (useWorker) {
-      runProcessingInWorker(btn, originalHtml);
+      runProcessingInWorker();
     } else {
       // Small file, or Workers unsupported/unavailable (e.g. some browsers
       // restrict Worker script loading when the page is opened via file://
       // rather than served over http/https) — fall back to the original
       // synchronous path so the app still works either way.
-      setTimeout(() => runProcessingSync(btn, originalHtml), 50);
+      setTimeout(runProcessingSync, 50);
     }
   }
 
-  function runProcessingSync(btn, originalHtml) {
+  function runProcessingSync() {
     try {
       App.state = PODataCore.processDataset(App.rawHeaders, App.rawRows);
       // Run all new analysis engines (same as the Worker path, but synchronous)
@@ -342,16 +214,14 @@
           discountAnalysis: App.state.discountAnalysis, totalPurchaseValue: App.state.kpis.totalPurchaseValue
         });
       }
-      finishDashboardGeneration(btn, originalHtml);
+      finishDashboardGeneration();
     } catch (err) {
       console.error(err);
-      showToast('Something went wrong generating the dashboard.', 'error');
-      btn.innerHTML = originalHtml;
-      btn.disabled = false;
+      showLoadingOverlay('Something went wrong generating the dashboard. Please refresh to retry.', true);
     }
   }
 
-  function runProcessingInWorker(btn, originalHtml) {
+  function runProcessingInWorker() {
     let worker;
     try {
       worker = new Worker('data-worker.js');
@@ -359,7 +229,7 @@
       // Worker construction itself can throw synchronously in restrictive
       // environments (e.g. file:// in some browsers) — fall back immediately.
       console.warn('Web Worker unavailable, falling back to synchronous processing:', err);
-      setTimeout(() => runProcessingSync(btn, originalHtml), 50);
+      setTimeout(runProcessingSync, 50);
       return;
     }
 
@@ -372,29 +242,27 @@
       settled = true;
       console.warn('Worker timed out, falling back to synchronous processing');
       worker.terminate();
-      runProcessingSync(btn, originalHtml);
+      runProcessingSync();
     }, 30000);
 
     worker.onmessage = (e) => {
       const msg = e.data;
       if (msg.type === 'progress') {
-        btn.innerHTML = `<span class="spinner"></span> ${escapeHtml(msg.stage)}`;
+        updateLoadingOverlay(msg.stage);
       } else if (msg.type === 'done') {
         if (settled) return;
         settled = true;
         clearTimeout(timeoutId);
         worker.terminate();
         App.state = msg.state;
-        finishDashboardGeneration(btn, originalHtml);
+        finishDashboardGeneration();
       } else if (msg.type === 'error') {
         if (settled) return;
         settled = true;
         clearTimeout(timeoutId);
         worker.terminate();
         console.error('Worker processing error:', msg.message);
-        showToast('Something went wrong generating the dashboard.', 'error');
-        btn.innerHTML = originalHtml;
-        btn.disabled = false;
+        showLoadingOverlay('Something went wrong generating the dashboard. Please refresh to retry.', true);
       }
     };
 
@@ -404,28 +272,43 @@
       clearTimeout(timeoutId);
       worker.terminate();
       console.warn('Worker errored, falling back to synchronous processing:', err.message);
-      runProcessingSync(btn, originalHtml);
+      runProcessingSync();
     };
 
     worker.postMessage({ type: 'process', headers: App.rawHeaders, rows: App.rawRows });
   }
 
-  function finishDashboardGeneration(btn, originalHtml) {
+  function finishDashboardGeneration() {
     if (!App.state.rows.length) {
-      showToast('No usable data rows found in this sheet.', 'error');
-      btn.innerHTML = originalHtml; btn.disabled = false;
+      showLoadingOverlay('No usable data rows found in the connected sheet.', true);
       return;
     }
     App.filteredRows = App.state.rows.slice();
     populateFilters();
     applyFiltersAndRender();
-    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-    document.querySelector('.sidebar-link[data-view="dashboard"]').classList.add('active');
-    showView('dashboard');
-    document.getElementById('postUploadNav').style.display = 'block';
-    showToast('Dashboard generated successfully', 'success');
-    btn.innerHTML = originalHtml;
-    btn.disabled = false;
+    hideLoadingOverlay();
+    showToast('Live dashboard loaded', 'success');
+  }
+
+  /**
+   * Full-page overlay shown while the live sheet is fetched/parsed/processed
+   * on every page load, since the dashboard is now the only view — there's
+   * no upload screen underneath it to show instead.
+   */
+  function showLoadingOverlay(message, isError) {
+    const overlay = document.getElementById('dashboardLoadingOverlay');
+    const text = document.getElementById('dashboardLoadingText');
+    const spinner = document.getElementById('dashboardLoadingSpinner');
+    overlay.style.display = 'flex';
+    text.textContent = message;
+    spinner.style.display = isError ? 'none' : 'block';
+    text.style.color = isError ? 'var(--red, #dc2626)' : '';
+  }
+  function updateLoadingOverlay(message) {
+    document.getElementById('dashboardLoadingText').textContent = message;
+  }
+  function hideLoadingOverlay() {
+    document.getElementById('dashboardLoadingOverlay').style.display = 'none';
   }
 
   /* ---------------- Filters ---------------- */

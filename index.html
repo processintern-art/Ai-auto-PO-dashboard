@@ -15,6 +15,14 @@
 </head>
 <body>
 
+<!-- Shown while the live Google Sheets CSV is fetched, parsed, and the
+     dashboard is generated — on every page load / refresh, since there is
+     no upload screen underneath to show in the meantime. -->
+<div id="dashboardLoadingOverlay" style="display:flex; position:fixed; inset:0; background:var(--bg,#fff); z-index:9998; align-items:center; justify-content:center; flex-direction:column; gap:16px; font-family:-apple-system,Segoe UI,Inter,sans-serif;">
+  <div id="dashboardLoadingSpinner" class="spinner" style="width:34px; height:34px; border-width:3px;"></div>
+  <div id="dashboardLoadingText" style="color:#475569; font-size:14px; max-width:420px; text-align:center; line-height:1.6; padding:0 20px;">Fetching live data…</div>
+</div>
+
 <!-- Shown only if a required library fails to load from every CDN tried -->
 <div id="libLoadError" style="display:none; position:fixed; inset:0; background:#fff; z-index:9999; padding:40px; font-family:-apple-system,Segoe UI,Inter,sans-serif;">
   <div style="max-width:560px; margin:60px auto; text-align:center;">
@@ -39,58 +47,50 @@
     </div>
 
     <nav class="sidebar-nav">
-      <div class="sidebar-section-label">Workspace</div>
-      <div class="sidebar-link active" data-view="upload">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Upload Data
+      <div class="sidebar-section-label">Analytics</div>
+      <div class="sidebar-link active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        Dashboard
       </div>
-
-      <div id="postUploadNav" style="display:none;">
-        <div class="sidebar-section-label">Analytics</div>
-        <div class="sidebar-link" data-view="dashboard">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-          Dashboard
-        </div>
-        <div class="sidebar-link" data-view="charts">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Charts &amp; Analytics
-        </div>
-        <div class="sidebar-link" data-view="items">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7L12 3 4 7l8 4 8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/></svg>
-          Item Analysis
-        </div>
-        <div class="sidebar-link" data-view="vendors">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/></svg>
-          Vendor Analysis
-        </div>
-        <div class="sidebar-link" data-view="scorecard">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
-          Vendor Scorecard
-        </div>
-        <div class="sidebar-link" data-view="insights">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .8 1.6V17h6.4v-.7c0-.6.3-1.2.8-1.6A7 7 0 0012 2z"/></svg>
-          AI Insights
-        </div>
-        <div class="sidebar-link" data-view="savings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-          Savings Opportunity
-        </div>
-        <div class="sidebar-link" data-view="recommendations">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Recommendations
-        </div>
-        <div class="sidebar-link" data-view="alerts">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-          Smart Alerts
-        </div>
-        <div class="sidebar-link" data-view="data">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-          Data Table
-        </div>
+      <div class="sidebar-link" data-view="charts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Charts &amp; Analytics
+      </div>
+      <div class="sidebar-link" data-view="items">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7L12 3 4 7l8 4 8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/></svg>
+        Item Analysis
+      </div>
+      <div class="sidebar-link" data-view="vendors">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/></svg>
+        Vendor Analysis
+      </div>
+      <div class="sidebar-link" data-view="scorecard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+        Vendor Scorecard
+      </div>
+      <div class="sidebar-link" data-view="insights">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .8 1.6V17h6.4v-.7c0-.6.3-1.2.8-1.6A7 7 0 0012 2z"/></svg>
+        AI Insights
+      </div>
+      <div class="sidebar-link" data-view="savings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        Savings Opportunity
+      </div>
+      <div class="sidebar-link" data-view="recommendations">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Recommendations
+      </div>
+      <div class="sidebar-link" data-view="alerts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Smart Alerts
+      </div>
+      <div class="sidebar-link" data-view="data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        Data Table
       </div>
     </nav>
 
-    <div class="sidebar-foot">Generates fully client-side. Your data never leaves this browser tab.</div>
+    <div class="sidebar-foot">Live dashboard. Data is fetched fresh from the configured source on every load — nothing is stored on a server.</div>
   </aside>
 
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -102,7 +102,7 @@
         <div class="icon-btn sidebar-toggle" id="sidebarToggle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </div>
-        <div class="topbar-title" id="topbarTitleText">Upload Data</div>
+        <div class="topbar-title" id="topbarTitleText">Dashboard Overview</div>
       </div>
       <div class="topbar-right">
         <div class="icon-btn" id="themeToggle" title="Toggle dark mode">
@@ -127,56 +127,8 @@
 
     <div class="content">
 
-      <!-- ================= VIEW: UPLOAD ================= -->
-      <section class="view active" id="view-upload">
-        <div class="upload-wrap">
-          <div class="upload-zone" id="uploadZone">
-            <div class="upload-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            </div>
-            <div class="upload-title">Drag &amp; drop your Purchase Order file here</div>
-            <div class="upload-sub">or click anywhere in this box to browse — dashboard generates automatically, no setup needed</div>
-            <button class="btn btn-primary" id="browseBtn" type="button">Browse File</button>
-            <input type="file" id="fileInput" class="upload-hidden-input" accept=".xlsx,.xls,.csv">
-            <div class="upload-formats">
-              <span class="format-chip">.XLSX</span>
-              <span class="format-chip">.XLS</span>
-              <span class="format-chip">.CSV</span>
-              <span class="format-chip">Multi-sheet supported</span>
-              <span class="format-chip">Auto header detection</span>
-            </div>
-          </div>
-
-          <div class="gsheet-row">
-            <input type="text" class="gsheet-input" id="gsheetInput" placeholder="Or paste a public Google Sheets link…">
-            <button class="btn btn-outline" id="gsheetLoadBtn" type="button">Load Sheet</button>
-          </div>
-
-          <!-- Sheet picker + data preview, hidden until a file is loaded -->
-          <div class="preview-card" id="previewCard" style="display:none;">
-            <div class="preview-head">
-              <div class="preview-head-title">Data Preview</div>
-              <div id="previewRowCount" style="font-size:12px;color:var(--text-muted);"></div>
-            </div>
-            <div class="sheet-tabs" id="sheetTabs"></div>
-            <div class="preview-table-wrap">
-              <table class="preview-table">
-                <thead><tr id="previewHeadRow"></tr></thead>
-                <tbody id="previewBody"></tbody>
-              </table>
-            </div>
-            <div class="preview-actions">
-              <button class="btn btn-primary" id="generateBtn" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                Generate Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- ================= VIEW: DASHBOARD ================= -->
-      <section class="view" id="view-dashboard">
+      <section class="view active" id="view-dashboard">
         <div class="filters-bar">
           <div class="filter-field">
             <label>Financial Year</label>
