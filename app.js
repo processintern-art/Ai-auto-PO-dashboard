@@ -50,6 +50,7 @@
       initExportMenu();
       initTableControls();
       initWhyModal();
+      initLiveClock();
       loadLiveDashboard();
     }).catch(err => {
       // lib-loader.js already shows an in-page error banner in this case;
@@ -100,6 +101,7 @@
     const target = document.getElementById('view-' + viewName);
     if (target) target.classList.add('active');
     document.getElementById('topbarTitleText').textContent = viewTitle(viewName);
+    document.body.classList.toggle('is-dashboard-view', viewName === 'dashboard');
   }
   function viewTitle(v) {
     return {
@@ -108,6 +110,39 @@
       data: 'Data Table', scorecard: 'Vendor Scorecard', savings: 'Savings Opportunity',
       recommendations: 'Smart Recommendations', alerts: 'Smart Alerts'
     }[v] || 'Dashboard';
+  }
+
+  /* ---------------- Live Date & Time widget ---------------- */
+  const CLOCK_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const CLOCK_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function initLiveClock() {
+    const dateEl = document.getElementById('liveClockDate');
+    const timeEl = document.getElementById('liveClockTime');
+    if (!dateEl || !timeEl) return;
+
+    // Dashboard is the default landing view, so show the widget immediately;
+    // showView() keeps this class in sync on every subsequent navigation.
+    document.body.classList.add('is-dashboard-view');
+
+    const pad2 = (n) => String(n).padStart(2, '0');
+
+    function renderClock() {
+      // new Date() always reflects the browser's local timezone — no
+      // timezone conversion needed. Re-reading it fresh every tick is also
+      // what makes the date line roll over automatically at midnight.
+      const now = new Date();
+      dateEl.textContent = `${CLOCK_WEEKDAYS[now.getDay()]}, ${pad2(now.getDate())} ${CLOCK_MONTHS[now.getMonth()]}, ${now.getFullYear()}`;
+
+      let hours = now.getHours();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      if (hours === 0) hours = 12;
+      timeEl.textContent = `${pad2(hours)}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())} ${ampm}`;
+    }
+
+    renderClock();
+    setInterval(renderClock, 1000);
   }
 
   /* ---------------- Live data load ---------------- */
