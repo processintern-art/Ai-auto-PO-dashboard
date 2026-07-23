@@ -416,12 +416,15 @@ function processDataset(headers, dataRows) {
       obj.taxAmount = (obj.quantity * obj.unitRate) * (obj.taxRate / 100);
     }
 
-    // effectiveAmount: kept as a per-row display/debug figure only — "this row's
-    // own most-final money value" (Net Total > Gross Amount > Total Value),
-    // preferring the most-final/most-downstream column actually present on THIS
-    // row. NOT used for PO/vendor/monthly/KPI aggregation: those roll up per
-    // unique PO in computeAggregates() using the Net Total → sum(Gross Amount)
-    // → sum(Total Value) precedence, never a per-row or Math.max()'d value.
+    // effectiveAmount: "this row's own final money value" — Net Total for this
+    // row if present, else Gross Amount, else Total Value (fallback applies
+    // per row, only when the higher-priority field is blank on THAT row).
+    // Used directly, unmodified, as the per-row contribution to the KPI Total
+    // Purchase Value (a flat sum across every row — see computeAggregates()).
+    // It is NOT used for Vendor Totals / Monthly Trend / FY Totals, which
+    // roll up per unique PO instead (Net Total taken once per PO → sum of
+    // Gross Amount → sum of Total Value) so a PO with many line-item rows
+    // isn't counted once per row in those breakdowns.
     obj.effectiveAmount = obj.netTotal || obj.grossAmount || obj.totalValue || 0;
     // effectiveLineValue: the best figure for THIS LINE ITEM specifically (used for
     // item-level analysis), preferring the line subtotal over PO-level totals, since
@@ -487,11 +490,13 @@ function computeAggregates(rows, extra) {
   // Single combined pass: for each PO, resolve both its effective total
   // amount AND its "attribution row" (the row whose vendor/date/FY the
   // total should be credited to) in one pass, instead of redoing this same
-  // per-PO-group computation 4 separate times across vendor totals, monthly
-  // trend, FY totals, and the KPI sum below. On a 100,000-row dataset this
-  // combined pass measured ~4x faster than the previous repeated-computation
-  // version, which was enough to freeze the UI for over a second every time
-  // filters were cleared back to "All".
+  // per-PO-group computation 3 separate times across vendor totals, monthly
+  // trend, and FY totals below. On a 100,000-row dataset this combined pass
+  // measured ~4x faster than the previous repeated-computation version,
+  // which was enough to freeze the UI for over a second every time filters
+  // were cleared back to "All". (The KPI Total Purchase Value does NOT use
+  // this map — see the flat per-row sum below — so it is unaffected by, and
+  // does not need to reconcile with, this PO-level rollup.)
   const poEffectiveAmount = new Map(); // poNumber -> resolved total for that PO (counted once, never per-row)
   const poAttributionRow = new Map();  // poNumber -> the row to credit vendor/date/FY to
   for (const [poNum, poRows] of poGroups.entries()) {
@@ -523,8 +528,17 @@ function computeAggregates(rows, extra) {
     poAttributionRow.set(poNum, poRows[0]);
   }
 
-  // KPIs — sum ONE resolved amount per PO, not per row
-  const totalPurchaseValue = Array.from(poEffectiveAmount.values()).reduce((s, v) => s + v, 0);
+  // KPI Total Purchase Value — flat per-row sum, deliberately NOT the PO-level
+  // rollup used below for Vendor Totals / Monthly Trend / FY Totals. Every row
+  // that carries a Net Total contributes its own value once — duplicate PO
+  // Numbers are NOT collapsed, nothing is grouped, and no Math.max() is
+  // involved. row.effectiveAmount already encodes the required per-row
+  // precedence (Net Total > Gross Amount > Total Value, falling through only
+  // when the higher-priority field is blank for THAT row), so this is
+  // equivalent to: rows.reduce((sum, row) => sum + (Number(row.netTotal) || 0), 0)
+  // for every row that has a Net Total, with the Gross Amount / Total Value
+  // fallback applying only to rows where Net Total itself is blank.
+  const totalPurchaseValue = rows.reduce((sum, row) => sum + (Number(row.effectiveAmount) || 0), 0);
   const totalPOs = poGroups.size;
   const totalVendors = new Set(rows.map(r => r.vendorName)).size;
   const itemAnalysis = aggregateItems(rows);
