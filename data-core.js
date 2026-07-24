@@ -416,15 +416,9 @@ function processDataset(headers, dataRows) {
       obj.taxAmount = (obj.quantity * obj.unitRate) * (obj.taxRate / 100);
     }
 
-    // effectiveAmount: "this row's own final money value" — Net Total for this
-    // row if present, else Gross Amount, else Total Value (fallback applies
-    // per row, only when the higher-priority field is blank on THAT row).
-    // Used directly, unmodified, as the per-row contribution to the KPI Total
-    // Purchase Value (a flat sum across every row — see computeAggregates()).
-    // It is NOT used for Vendor Totals / Monthly Trend / FY Totals, which
-    // roll up per unique PO instead (Net Total taken once per PO → sum of
-    // Gross Amount → sum of Total Value) so a PO with many line-item rows
-    // isn't counted once per row in those breakdowns.
+    // effectiveAmount: the best single "this row's final money value" figure,
+    // preferring the most-final/most-downstream column actually present.
+    // Net Total (post-tax PO total) > Gross Amount (pre-net PO total) > Total Value (pre-tax line subtotal).
     obj.effectiveAmount = obj.netTotal || obj.grossAmount || obj.totalValue || 0;
     // effectiveLineValue: the best figure for THIS LINE ITEM specifically (used for
     // item-level analysis), preferring the line subtotal over PO-level totals, since
@@ -469,18 +463,13 @@ function processDataset(headers, dataRows) {
 function computeAggregates(rows, extra) {
   // ---- PO-level rollup ----
   // Many real PO files (e.g. PO Tracker exports) carry one row per PO with the
-  // financial total (Net Total), plus several more rows per PO that are pure
-  // line items with no PO-level total of their own. Net Total is a merged cell
-  // that Excel/pandas exports as present on only ONE row of the PO (usually the
-  // first) and blank on the rest — it is a single PO-level fact, never a
-  // per-row fact, so it must be taken once and never summed or max'd against
-  // other rows. Gross Amount and Total Value, by contrast, are genuine
-  // per-line figures and DO need to be summed across every row of the PO when
-  // there is no Net Total to fall back on. Roll up to ONE resolved amount per
-  // PO using this strict precedence — Net Total (take it once) → sum of Gross
-  // Amount → sum of Total Value — with NO Math.max()/largest-row-amount logic
-  // anywhere in this resolution, since "largest line item" has no defined
-  // relationship to what the PO actually cost.
+  // financial total, plus several more rows per PO that are pure line items with
+  // no PO-level total of their own. Summing effectiveAmount across every row of
+  // a PO would massively over-count. Instead, roll up to ONE effective amount
+  // per PO: take the largest effectiveAmount seen on any of that PO's rows
+  // (covers the common case where exactly one row in the group carries it),
+  // and fall back to summing that PO's line-item values only if no row carried
+  // any PO-level total at all.
   const poGroups = new Map();
   for (const r of rows) {
     const key = r.poNumber || `__no_po_${poGroups.size}`;
@@ -489,56 +478,35 @@ function computeAggregates(rows, extra) {
   }
   // Single combined pass: for each PO, resolve both its effective total
   // amount AND its "attribution row" (the row whose vendor/date/FY the
-  // total should be credited to) in one pass, instead of redoing this same
-  // per-PO-group computation 3 separate times across vendor totals, monthly
-  // trend, and FY totals below. On a 100,000-row dataset this combined pass
-  // measured ~4x faster than the previous repeated-computation version,
-  // which was enough to freeze the UI for over a second every time filters
-  // were cleared back to "All". (The KPI Total Purchase Value does NOT use
-  // this map — see the flat per-row sum below — so it is unaffected by, and
-  // does not need to reconcile with, this PO-level rollup.)
-  const poEffectiveAmount = new Map(); // poNumber -> resolved total for that PO (counted once, never per-row)
+  // total should be credited to) in one filter+reduce, instead of redoing
+  // this same per-PO-group computation 4 separate times across vendor
+  // totals, monthly trend, FY totals, and the gross-amount sum below. On a
+  // 100,000-row dataset this combined pass measured ~4x faster than the
+  // previous repeated-computation version, which was enough to freeze the
+  // UI for over a second every time filters were cleared back to "All".
+  const poEffectiveAmount = new Map(); // poNumber -> resolved total for that PO
   const poAttributionRow = new Map();  // poNumber -> the row to credit vendor/date/FY to
   for (const [poNum, poRows] of poGroups.entries()) {
-    // Rule 1: if ANY row in this PO carries a Net Total, that single value IS
-    // the PO Total — full stop. Gross Amount and Total Value on every row of
-    // this PO (including the Net Total row itself) are ignored entirely. Take
-    // the first row that carries it; because Net Total is a merged-cell value
-    // duplicated (not distinct) across a PO's rows, summing every non-blank
-    // occurrence would double- or 10x-count the same PO total.
-    const netTotalRow = poRows.find(r => (r.netTotal || 0) > 0);
-    if (netTotalRow) {
-      poEffectiveAmount.set(poNum, netTotalRow.netTotal);
-      poAttributionRow.set(poNum, netTotalRow);
-      continue;
+    let maxAmount = 0, maxRow = null, sumLineValue = 0;
+    for (const r of poRows) {
+      if (r.effectiveAmount > 0 && (maxRow === null || r.effectiveAmount > maxAmount)) {
+        maxAmount = r.effectiveAmount;
+        maxRow = r;
+      }
+      sumLineValue += r.effectiveLineValue || 0;
     }
-    // Rule 2: no Net Total anywhere in this PO — sum Gross Amount across
-    // every row of the PO (each row's Gross Amount is a genuine per-line
-    // figure here, so summing is correct and each row is counted exactly once).
-    const sumGrossAmount = poRows.reduce((s, r) => s + (r.grossAmount || 0), 0);
-    if (sumGrossAmount > 0) {
-      poEffectiveAmount.set(poNum, sumGrossAmount);
+    if (maxRow) {
+      poEffectiveAmount.set(poNum, maxAmount);
+      poAttributionRow.set(poNum, maxRow);
+    } else {
+      // No row carried a PO-level total at all — fall back to summing line items
+      poEffectiveAmount.set(poNum, sumLineValue);
       poAttributionRow.set(poNum, poRows[0]);
-      continue;
     }
-    // Rule 3: no Net Total and no Gross Amount anywhere in this PO — fall
-    // back to summing Total Value across every row of the PO.
-    const sumTotalValue = poRows.reduce((s, r) => s + (r.totalValue || 0), 0);
-    poEffectiveAmount.set(poNum, sumTotalValue);
-    poAttributionRow.set(poNum, poRows[0]);
   }
 
-  // KPI Total Purchase Value — flat per-row sum, deliberately NOT the PO-level
-  // rollup used below for Vendor Totals / Monthly Trend / FY Totals. Every row
-  // that carries a Net Total contributes its own value once — duplicate PO
-  // Numbers are NOT collapsed, nothing is grouped, and no Math.max() is
-  // involved. row.effectiveAmount already encodes the required per-row
-  // precedence (Net Total > Gross Amount > Total Value, falling through only
-  // when the higher-priority field is blank for THAT row), so this is
-  // equivalent to: rows.reduce((sum, row) => sum + (Number(row.netTotal) || 0), 0)
-  // for every row that has a Net Total, with the Gross Amount / Total Value
-  // fallback applying only to rows where Net Total itself is blank.
-  const totalPurchaseValue = rows.reduce((sum, row) => sum + (Number(row.effectiveAmount) || 0), 0);
+  // KPIs — sum ONE resolved amount per PO, not per row
+  const totalPurchaseValue = Array.from(poEffectiveAmount.values()).reduce((s, v) => s + v, 0);
   const totalPOs = poGroups.size;
   const totalVendors = new Set(rows.map(r => r.vendorName)).size;
   const itemAnalysis = aggregateItems(rows);
